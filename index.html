@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ParkPath SG: Real-Time Singapore Carpark Navigator</title>
+  
+  <!-- SEO Elements -->
+  <meta name="description" content="A real-time, serverless Singapore carpark availability finder and navigation portal. Powered by OneMap SG, Data.gov.sg, and LTA.">
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Share+Tech+Mono&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+  
+  <!-- Leaflet Map CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="style.css">
+  
+  <!-- Proj4js Coordinate Projection Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.8.0/proj4.js"></script>
+  
+  <!-- Leaflet Map JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+</head>
+<body>
+
+  <!-- Background holographic scanline effect for cyber-driving HUD -->
+  <div class="scanline"></div>
+
+  <!-- Ambient light leaks -->
+  <div class="glow-cyan"></div>
+  <div class="glow-amber"></div>
+
+  <!-- Fullscreen Map Canvas -->
+  <div id="map"></div>
+
+  <!-- HUD Master Wrapper -->
+  <div class="hud-container">
+    
+    <!-- 1. Floating Console Header -->
+    <header class="hud-header glass-card">
+      <div class="brand-logo">
+        <span class="logo-text">PARKPATH <span class="highlight">SG</span></span>
+        <span class="logo-sub">LIVE PARKING & ROUTE INTEGRATOR</span>
+      </div>
+      <div class="live-clock" id="live-clock">23:50:00</div>
+    </header>
+
+    <!-- 2. Main Search Console & Side Recommendations Panel -->
+    <main class="hud-main">
+      
+      <!-- Side Recommendations Console -->
+      <section class="side-panel glass-card">
+        
+        <!-- Search bar layout -->
+        <div class="search-section">
+          <h3>📍 ENTER DESTINATION</h3>
+          <div class="search-box-row">
+            <input type="text" id="search-input" placeholder="Postal code, building name, street..." autocomplete="off">
+            <button id="clear-search-btn" title="Clear input">✕</button>
+          </div>
+          <!-- Auto-suggest lists dropdown -->
+          <div id="suggest-list" class="suggest-dropdown"></div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Dynamic Parking recommendations list -->
+        <div class="results-section">
+          <div class="results-header">
+            <h3>🚗 NEARBY PARKING</h3>
+            <span class="radius-indicator">400m radius</span>
+          </div>
+          
+          <div class="results-filters">
+            <button class="filter-btn active" data-filter="score">SMART OPTIMAL</button>
+            <button class="filter-btn" data-filter="lots">LIVE LOTS</button>
+            <button class="filter-btn" data-filter="distance">WALK DIST</button>
+          </div>
+
+          <div class="results-list" id="carparks-list">
+            <div class="empty-state">
+              <span class="empty-icon">🗺️</span>
+              <p>Type a location to search for nearby parking and live availability.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Selected Carpark Details Card (Appears when marker or recommendation is clicked) -->
+      <div id="detail-drawer" class="detail-drawer glass-card">
+        <button id="close-drawer-btn" class="close-drawer">✕</button>
+        <div class="drawer-header">
+          <span class="drawer-no" id="drawer-no">JM30</span>
+          <h4 class="drawer-address" id="drawer-address">BLK 123 JURONG EAST STREET 13</h4>
+        </div>
+        
+        <div class="drawer-stats-grid">
+          <div class="stat-box">
+            <span class="stat-label">LIVE VACANT LOTS</span>
+            <span class="stat-value" id="drawer-lots">Fetching...</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">WALKING DISTANCE</span>
+            <span class="stat-value" id="drawer-distance">240m</span>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="drawer-details">
+          <div class="detail-row">
+            <span class="det-label">System Type:</span>
+            <span class="det-value" id="drawer-system">ELECTRONIC PARKING</span>
+          </div>
+          <div class="detail-row">
+            <span class="det-label">Gantry Height:</span>
+            <span class="det-value" id="drawer-height">2.15m</span>
+          </div>
+          <div class="detail-row">
+            <span class="det-label">Free Parking:</span>
+            <span class="det-value highlight-gold" id="drawer-free">SUN & PH FR 7AM-10:30PM</span>
+          </div>
+        </div>
+
+        <button id="navigate-btn" class="btn-navigate">
+          <span class="nav-icon">🧭</span> START CARPARK NAVIGATION
+        </button>
+      </div>
+
+    </main>
+    
+  </div>
+
+  <!-- Core App Controller Script -->
+  <script type="module" src="app.js"></script>
+
+</body>
+</html>
