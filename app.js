@@ -158,18 +158,61 @@ function setupUIEventListeners() {
   });
 }
 
-// Fetch address coordinates search suggestions from OneMap SG API
+// Fetch address coordinates search suggestions from OneMap SG API and OpenStreetMap Nominatim
 async function fetchAddressSuggestions(query) {
   try {
-    const url = `https://www.onemap.gov.sg/api/common/elastic/search?searchVal=${encodeURIComponent(query)}&returnGeom=Y&getAddrDetails=Y&pageNum=1`;
-    const res = await fetch(url);
-    const data = await res.json();
+    // 1. Query OneMap SG for official building/postal codes
+    const oneMapUrl = `https://www.onemap.gov.sg/api/common/elastic/search?searchVal=${encodeURIComponent(query)}&returnGeom=Y&getAddrDetails=Y&pageNum=1`;
+    const oneMapRes = await fetch(oneMapUrl);
+    const oneMapData = await oneMapRes.json();
     
-    const results = data.results || [];
-    renderSuggestions(results);
+    const results = (oneMapData.results || []).map(item => ({
+      name: item.BUILDING || item.ROAD || "Singapore Location",
+      address: item.ADDRESS || "",
+      lat: parseFloat(item.LATITUDE),
+      lon: parseFloat(item.LONGITUDE),
+      source: "OneMap"
+    }));
+
+    // 2. Query OpenStreetMap Nominatim for businesses, cafes, and POIs
+    const osmUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query + ', Singapore')}&format=json&limit=5`;
+    const osmRes = await fetch(osmUrl, {
+      headers: { 'Accept-Language': 'en' }
+    });
+    const osmData = await osmRes.json();
+    
+    const osmResults = (osmData || []).map(item => {
+      // Clean up display name
+      const parts = item.display_name.split(', ');
+      const name = parts[0] || "Commercial Venue";
+      const address = parts.slice(1, 4).join(', '); // Street, Area, etc.
+      
+      return {
+        name: name,
+        address: address,
+        lat: parseFloat(item.lat),
+        lon: parseFloat(item.lon),
+        source: "OpenStreetMap"
+      };
+    });
+
+    // 3. Merge results (prioritize OneMap, append unique OSM entries)
+    const combined = [...results];
+    osmResults.forEach(osmItem => {
+      // Prevent duplicates by checking if coordinates are extremely close to an existing result
+      const isDuplicate = combined.some(item => 
+        Math.abs(item.lat - osmItem.lat) < 0.0005 && 
+        Math.abs(item.lon - osmItem.lon) < 0.0005
+      );
+      if (!isDuplicate) {
+        combined.push(osmItem);
+      }
+    });
+
+    renderSuggestions(combined);
 
   } catch (err) {
-    console.error("OneMap Autocomplete search failed:", err);
+    console.error("Autocomplete search failed:", err);
   }
 }
 
@@ -183,24 +226,26 @@ function renderSuggestions(results) {
     return;
   }
 
-  results.slice(0, 5).forEach(item => {
+  results.slice(0, 6).forEach(item => {
     const row = document.createElement('div');
     row.className = 'suggest-item';
     
-    // Highlight first word or match
-    const bName = item.BUILDING || item.ROAD || "Singapore Location";
-    const bAddr = item.ADDRESS || "";
+    // Custom label badge for high-end look
+    const sourceBadge = item.source === 'OpenStreetMap' ? '🏪 Business' : '📍 Address';
 
     row.innerHTML = `
-      <span class="suggest-name">${bName}</span>
-      <span class="suggest-address">${bAddr}</span>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span class="suggest-name" style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:700;">${item.name}</span>
+        <span style="font-size:0.55rem; color:var(--accent-cyan); background:rgba(0,242,254,0.08); padding:2px 5px; border-radius:3px; font-weight:700; flex-shrink:0; margin-left:6px; letter-spacing:0.5px;">${sourceBadge}</span>
+      </div>
+      <span class="suggest-address">${item.address}</span>
     `;
 
     // Dropdown selection click
     row.addEventListener('click', () => {
-      document.getElementById('search-input').value = bName;
+      document.getElementById('search-input').value = item.name;
       hideSuggestions();
-      selectLocationDestination(parseFloat(item.LATITUDE), parseFloat(item.LONGITUDE), bName);
+      selectLocationDestination(item.lat, item.lon, item.name);
     });
 
     dropdown.appendChild(row);
